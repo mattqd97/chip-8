@@ -13,8 +13,7 @@ mod cpu {
         sound_timer: u8, // 8 Bit sound timer.
         ram: [u8; RAM_SIZE], // 4096 8 bit values to total 4k RAM?
         keypad: [bool; 16], // Keypad has 16 keys
-        display_height: [u8; DISPLAY_HEIGHT], // 64 8 bit values
-        display_width: [u8; DISPLAY_WIDTH], // 32 8 bit values
+        display: [u8; DISPLAY_HEIGHT * DISPLAY_WIDTH], // 64 * 32 8 bit values
     }
 
     enum Opcodes {
