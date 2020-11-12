@@ -1,3 +1,5 @@
-fn main() {
+mod cpu;
 
+fn main() {
+    // cpu::Cpu{}
 }
