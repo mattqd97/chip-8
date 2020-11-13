@@ -13,8 +13,7 @@ mod cpu {
         sound_timer: u8, // 8 Bit sound timer.
         ram: [u8; RAM_SIZE], // 4096 8 bit values to total 4k RAM?
         keypad: [bool; 16], // Keypad has 16 keys
-        display_height: [[u8; DISPLAY_HEIGHT], [u8; DISPLAY_WIDTH]], // 64 8 bit values
-        display_width: [u8; DISPLAY_WIDTH], // 32 8 bit values
+        display: [u8; DISPLAY_HEIGHT * DISPLAY_WIDTH], // 64 * 32 8 bit values
     }
 
     enum Opcodes {
@@ -54,6 +53,20 @@ mod cpu {
     }
 
     impl Cpu {
+        // Initial setup.
+        pub fn new(&mut self) {
+            self.v = [0; 16];
+            self.i = 0;
+            self.stack = [0; 16];
+            self.pc = 0x200;
+            self.sp = 0;
+            self.delay_timer = 0;
+            self.sound_timer = 0;
+            self.ram = [0; RAM_SIZE];
+            self.keypad = [false; 16];
+            self.display = [0; DISPLAY_HEIGHT * DISPLAY_WIDTH];
+        }
+
         // This is the core function, which will simulate a cycle
         pub fn simulate_cycle(&mut self) {
            // Fetch the next instruction
@@ -72,6 +85,8 @@ mod cpu {
            self.pc += 2;
         }
 
+        // Does the left shit effectively turn all the bits to 0 in the part of memory that pc points to? 
+        // Why is there an OR if we've already set the value of ram[pc] with the left shift?
         fn fetch(&self) -> u16 {
             let pc = self.pc as usize;
             let instruction = self.ram[pc] << 8 | self.ram[pc];
