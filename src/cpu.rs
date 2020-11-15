@@ -22,8 +22,9 @@ mod cpu {
         RET,    // Return from subroutine
         JP,     // Jump to addr
         CALL,   // Call subroutine
-        SE_IMM, // Conditional skip
+        SE_IMM, // Conditional skip 3xkk
         SNE_IMM,// Conditional not skip
+        SE,     // Compare register
         LDR_IM, // Load immediate into reg
         ADD_IM, // Add immediate to reg
         LDR,    // Load reg into another reg
@@ -85,29 +86,210 @@ mod cpu {
            self.pc += 2;
         }
 
-        // Does the left shit effectively turn all the bits to 0 in the part of memory that pc points to? 
-        // Why is there an OR if we've already set the value of ram[pc] with the left shift?
         fn fetch(&self) -> u16 {
             let pc = self.pc as usize;
-            let instruction = self.ram[pc] << 8 | self.ram[pc];
+            let instruction = self.ram[pc] << 8 | self.ram[pc + 1];
             instruction as u16
         }
 
-        // TODO: Actually return Opcode enum
         fn decode(instruction : u16) -> (u8, u16) {
             let opcode = (instruction >> 12) as u8;
-            let arguments = instruction & 0x0FFF;
+            let nnn = instruction << 4 as u16; // Lowest 12 bits
+            let n = (instruction & 0x000F) as u8; // Lowest 4 bits
+            let x = (instruction >> 8) as u8 & 0x000F; // Lower 4 of high byte
+            let y = (instruction & 0xF000) as u8; // Upper 4 of lowe byte
+            let kk = (instruction & 0x00FF) as u8; // lowest 8 bits
 
-            (opcode, arguments)
+            // Do we even need to shift anything? 
+            // Would let x = instruction & 0x000F do the same thing?
+
+            (opcode, nnn) // What does this do?
         }
 
-        fn execute(&mut self, opcode: u8, instruction: u16) {
-            // To be implemented..
+        fn execute(&mut self, opcode: u8, nnn: u16, x: u8, y: u8, n: u8, kk: u8) {
+                match opcode {
+                    1 => self.jp(),
+                    2 => self.call(),
+                    3 => self.se_imm(),
+                    4 => self.sne_imm(),
+                    5 => self.se(),
+                    6 => self.ldr_im(),
+                    7 => self.add_im(),
+                    8 => 
+                    match n {
+                        0 => self.ldr(),
+                        1 => self.or(),
+                        2 => self.and(),
+                        3 => self.xor(),
+                        4 => self.add(),
+                        5 => self.sub(),
+                        6 => self.shr(),
+                        7 => self.subn(),
+                        174 => self.shl(),
+                    }
+                    9 => self.sne(),
+                    10 => self.ld_i(),
+                    11 => self.jp_reg(),
+                    12 => self.rnd(),
+                    13 => self.display(),
+                    14 => 
+                    match n {
+                        1 => self.sknp(),
+                        14 => self.skp(),
+                    }
+                    15 => 
+                    match n {
+                        3 => self.ld_b(),
+                        5 =>
+                        match y {
+                            1 => self.ldr_mul(),
+                            5 => self.ld_mul(),
+                            6 => self.ld_dt(),
+                        }
+                        7 => self.ldr_dt(),
+                        8 => self.ld_st(),
+                        9 => self.ld_i(),
+                        10 => self.ldr_kp(),
+                        14 => self.add_i(),
+                    }
+                }
+            
         }
 
         fn update_timers(&mut self) {
             // To be implemented..
         }
         
+        fn cls(&mut self){
+
+        }
+
+        fn ret(&mut self){
+
+        }
+
+        fn jp(&mut self){
+
+        }
+
+        fn call(&mut self){
+
+        }
+
+        fn se_imm(&mut self){
+
+        }
+
+        fn sne_imm(&mut self){
+
+        }
+
+        fn se(&mut self){
+
+        }
+
+        fn ldr_im(&mut self){
+
+        }
+
+        fn add_im(&mut self){
+
+        }
+
+        fn ldr(&mut self){
+
+        }
+
+        fn or(&mut self){
+
+        }
+
+        fn and(&mut self){
+
+        }
+
+        fn xor(&mut self){
+
+        }
+
+        fn add(&mut self){
+
+        }
+
+        fn sub(&mut self){
+
+        }
+
+        fn shr(&mut self){
+
+        }
+
+        fn subn(&mut self){
+
+        }
+        
+        fn shl(&mut self){
+
+        }
+
+        fn sne(&mut self){
+
+        }
+
+        fn ld_i(&mut self){
+
+        }
+
+        fn jp_reg(&mut self){
+
+        }
+        
+        fn rnd(&mut self){
+
+        }
+        
+        fn display(&mut self){
+
+        }
+        
+        fn skp(&mut self){
+
+        }
+        
+        fn sknp(&mut self){
+
+        }
+        
+        fn ldr_dt(&mut self){
+
+        }
+        
+        fn ldr_kp(&mut self){
+
+        }
+        
+        fn ld_dt(&mut self){
+
+        }
+        
+        fn ld_st(&mut self){
+
+        }
+        
+        fn add_i(&mut self){
+
+        }
+        
+        fn ld_b(&mut self){
+
+        }
+        
+        fn ld_mul(&mut self){
+
+        }
+        
+        fn ldr_mul(&mut self){
+
+        }
     }
 }
