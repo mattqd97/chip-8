@@ -74,10 +74,10 @@ mod cpu {
            let instruction = self.fetch();
 
            // Decode the instruction
-           let (opcode, arguments) = Cpu::decode(instruction);
+           let (opcode, nnn, n, x, y, kk) = Cpu::decode(instruction);
 
            // Execute the instruction
-           self.execute(opcode, arguments);
+           self.execute(opcode, nnn, n, x, y, kk);
 
            // Update Timers
            self.update_timers();
@@ -92,7 +92,7 @@ mod cpu {
             instruction as u16
         }
 
-        fn decode(instruction : u16) -> (u8, u16) {
+        fn decode(instruction : u16) -> (u8, u16, u8, u8, u8, u8) {
             let opcode = (instruction >> 12) as u8;
             let nnn = instruction << 4 as u16; // Lowest 12 bits
             let n = (instruction & 0x000F) as u8; // Lowest 4 bits
@@ -103,7 +103,7 @@ mod cpu {
             // Do we even need to shift anything? 
             // Would let x = instruction & 0x000F do the same thing?
 
-            (opcode, nnn) // What does this do?
+            (opcode, nnn, n, x, y, kk) // Commenting out gets rid of errors. why?
         }
 
         fn execute(&mut self, opcode: u8, nnn: u16, x: u8, y: u8, n: u8, kk: u8) {
@@ -126,6 +126,7 @@ mod cpu {
                         6 => self.shr(),
                         7 => self.subn(),
                         174 => self.shl(),
+                        _=> panic!("Err"),
                     }
                     9 => self.sne(),
                     10 => self.ld_i(),
@@ -136,6 +137,7 @@ mod cpu {
                     match n {
                         1 => self.sknp(),
                         14 => self.skp(),
+                        _=> panic!("Err"),
                     }
                     15 => 
                     match n {
@@ -145,13 +147,16 @@ mod cpu {
                             1 => self.ldr_mul(),
                             5 => self.ld_mul(),
                             6 => self.ld_dt(),
+                            _=> panic!("Err"),
                         }
                         7 => self.ldr_dt(),
                         8 => self.ld_st(),
                         9 => self.ld_i(),
                         10 => self.ldr_kp(),
                         14 => self.add_i(),
+                        _=> panic!("Err"),
                     }
+                    _=> panic!("Err"),
                 }
             
         }
