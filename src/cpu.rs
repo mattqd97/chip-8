@@ -16,8 +16,8 @@ mod cpu {
         display: [u8; DISPLAY_HEIGHT * DISPLAY_WIDTH], // 64 * 32 8 bit values
     }
 
-    enum Opcodes {
-        SYS,    // Ignore? syscall
+    enum Opcode {
+        // SYS,    // Ignore? syscall
         CLS,    // Clear Screen
         RET,    // Return from subroutine
         JP,     // Jump to addr
@@ -48,9 +48,46 @@ mod cpu {
         LD_DT,  // Load delay timer with reg
         LD_ST,  // Load sound timer with reg
         ADD_I,  // Add value to I reg
+        ADD_SP, // Add sprite
         LD_B,   // Load BCD value of reg into memory at I, I+1, I+2
         LD_MUL, // Load V0 to Vx into memory starting at I
         LDR_MUL,// Load V0 to Vx with memory starting at I
+        UNKNOWN,// Unknown opcode
+    }
+
+    #[derive(Copy, Clone)]
+    struct Operands {
+        instruction: u16
+    }
+
+    impl Operands {
+        fn new(instruction: u16) -> Operands {
+            Operands {
+                instruction: instruction
+            }
+        }
+
+        fn NNN(self) -> u16 {
+            self.instruction & 0x0FFF // Lowest 12 bits
+        }
+
+        fn NN(self) -> u16 {
+            self.instruction & 0x00FF // Lowest 8 bits
+        }
+
+        fn N(self) -> u16 {
+            self.instruction & 0x000F // Lowest 4 bits
+        }
+
+        fn X(self) -> u16 {
+            (self.instruction >> 8) & 0x000F // Lower 4 of high byte
+        }
+
+        fn Y(self) -> u16 {
+            (self.instruction >> 4) & 0x000F // Upper 4 of lowe byte
+        }
+
+        // let kk = (instruction & 0x00FF) as u8; // lowest 8 bits
     }
 
     impl Cpu {
@@ -92,71 +129,106 @@ mod cpu {
             instruction as u16
         }
 
-        fn decode(instruction : u16) -> (u8, u16, u8, u8, u8, u8) {
+        fn decode(instruction : u16) -> (Opcode, Operands) {
+            // Get operands first so can use to find opcode
+            let operands = Operands::new(instruction);
+
+            // Get opcode
             let opcode = (instruction >> 12) as u8;
-            let nnn = instruction << 4 as u16; // Lowest 12 bits
-            let n = (instruction & 0x000F) as u8; // Lowest 4 bits
-            let x = (instruction >> 8) as u8 & 0x000F; // Lower 4 of high byte
-            let y = (instruction & 0xF000) as u8; // Upper 4 of lowe byte
-            let kk = (instruction & 0x00FF) as u8; // lowest 8 bits
+            let opcode: Opcode = match opcode {
+                0 => match operands.NN() {
+                    0xE0 => Opcode::CLS,
+                    0xEE => Opcode::RET,
+                    _    => Opcode::UNKNOWN,
+                }
+                1 => Opcode::JP,
+                2 => Opcode::CALL,
+                3 => Opcode::SE_IMM,
+                4 => Opcode::SNE_IMM,
+                5 => Opcode::SE,
+                6 => Opcode::LDR_IM,
+                7 => Opcode::ADD_IM,
+                8 => match operands.N() {
+                    0x0 => Opcode::LDR,
+                    0x1 => Opcode::OR,
+                    0x2 => Opcode::AND,
+                    0x3 => Opcode::XOR,
+                    0x4 => Opcode::ADD,
+                    0x5 => Opcode::SUB,
+                    0x6 => Opcode::SHR,
+                    0x7 => Opcode::SUBN,
+                    0xE => Opcode::SHL,
+                    _   => Opcode::UNKNOWN,
+                }
+                9 => Opcode::SNE,
+                0xA => Opcode::LD_I,
+                0xB => Opcode::JP_REG,
+                0xC => Opcode::RND,
+                0xD => Opcode::DISPLAY,
+                0xE => match operands.NN() {
+                    0x9E => Opcode::SKP,
+                    0xA1 => Opcode::SKNP,
+                    _    => Opcode::UNKNOWN,
+                }
+                0xF => match operands.NN() {
+                    0x07 => Opcode::LDR_DT,
+                    0x0A => Opcode::LDR_KP,
+                    0x15 => Opcode::LD_DT,
+                    0x18 => Opcode::LD_ST,
+                    0x1E => Opcode::ADD_I,
+                    0x29 => Opcode::ADD_SP,
+                    0x33 => Opcode::LD_B,
+                    0x55 => Opcode::LD_MUL,
+                    0x65 => Opcode::LDR_MUL,
+                    _    => Opcode::UNKNOWN,
+                }
+                _ => Opcode::UNKNOWN,
+            };
 
-            // Do we even need to shift anything? 
+
             // Would let x = instruction & 0x000F do the same thing?
+            // 0x1234 >> 12 = 0x0001. 0x1234 & 0x000F = 0x1234
 
-            (opcode, nnn, n, x, y, kk) // Commenting out gets rid of errors. why?
+            (opcode, operands) // What does this do? Returns the tuple
         }
 
-        fn execute(&mut self, opcode: u8, nnn: u16, x: u8, y: u8, n: u8, kk: u8) {
+        fn execute(&mut self, opcode: Opcode, operands: Operands) {
                 match opcode {
-                    1 => self.jp(),
-                    2 => self.call(),
-                    3 => self.se_imm(),
-                    4 => self.sne_imm(),
-                    5 => self.se(),
-                    6 => self.ldr_im(),
-                    7 => self.add_im(),
-                    8 => 
-                    match n {
-                        0 => self.ldr(),
-                        1 => self.or(),
-                        2 => self.and(),
-                        3 => self.xor(),
-                        4 => self.add(),
-                        5 => self.sub(),
-                        6 => self.shr(),
-                        7 => self.subn(),
-                        174 => self.shl(),
-                        _=> panic!("Err"),
-                    }
-                    9 => self.sne(),
-                    10 => self.ld_i(),
-                    11 => self.jp_reg(),
-                    12 => self.rnd(),
-                    13 => self.display(),
-                    14 => 
-                    match n {
-                        1 => self.sknp(),
-                        14 => self.skp(),
-                        _=> panic!("Err"),
-                    }
-                    15 => 
-                    match n {
-                        3 => self.ld_b(),
-                        5 =>
-                        match y {
-                            1 => self.ldr_mul(),
-                            5 => self.ld_mul(),
-                            6 => self.ld_dt(),
-                            _=> panic!("Err"),
-                        }
-                        7 => self.ldr_dt(),
-                        8 => self.ld_st(),
-                        9 => self.ld_i(),
-                        10 => self.ldr_kp(),
-                        14 => self.add_i(),
-                        _=> panic!("Err"),
-                    }
-                    _=> panic!("Err"),
+                    Opcode::CLS     => self.cls(),
+                    Opcode::RET     => self.ret(),
+                    Opcode::JP      => self.jp(operands),
+                    Opcode::CALL    => self.call(operands),
+                    Opcode::SE_IMM  => self.se_imm(operands),
+                    Opcode::SNE_IMM => self.sne_imm(operands),
+                    Opcode::SE      => self.se(operands),
+                    Opcode::LDR_IM  => self.ldr_im(operands),
+                    Opcode::ADD_IM  => self.add_im(operands),
+                    Opcode::LDR     => self.ldr(operands),
+                    Opcode::OR      => self.or(operands),
+                    Opcode::AND     => self.and(operands),
+                    Opcode::XOR     => self.xor(operands),
+                    Opcode::ADD     => self.add(operands),
+                    Opcode::SUB     => self.sub(operands),
+                    Opcode::SHR     => self.shr(operands),
+                    Opcode::SUBN    => self.subn(operands),
+                    Opcode::SHL     => self.shl(operands),
+                    Opcode::SNE     => self.sne(operands),
+                    Opcode::LD_I    => self.ld_i(operands),
+                    Opcode::JP_REG  => self.jp_reg(operands),
+                    Opcode::RND     => self.rnd(operands),
+                    Opcode::DISPLAY => self.display(operands),
+                    Opcode::SKP     => self.skp(operands),
+                    Opcode::SKNP    => self.sknp(operands),
+                    Opcode::LDR_DT  => self.ldr_dt(operands),
+                    Opcode::LDR_KP  => self.ldr_kp(operands),
+                    Opcode::LD_DT   => self.ld_dt(operands),
+                    Opcode::LD_ST   => self.ld_st(operands),
+                    Opcode::ADD_I   => self.add_i(operands),
+                    Opcode::ADD_SP  => self.add_sp(operands),
+                    Opcode::LD_B    => self.ld_b(operands),
+                    Opcode::LD_MUL  => self.ld_mul(operands),
+                    Opcode::LDR_MUL => self.ldr_mul(operands),
+                    Opcode::UNKNOWN => println!("Unknown opcode"),
                 }
             
         }
@@ -173,127 +245,131 @@ mod cpu {
 
         }
 
-        fn jp(&mut self){
+        fn jp(&mut self, operands: Operands){
 
         }
 
-        fn call(&mut self){
+        fn call(&mut self, operands: Operands){
 
         }
 
-        fn se_imm(&mut self){
+        fn se_imm(&mut self, operands: Operands){
 
         }
 
-        fn sne_imm(&mut self){
+        fn sne_imm(&mut self, operands: Operands){
 
         }
 
-        fn se(&mut self){
+        fn se(&mut self, operands: Operands){
 
         }
 
-        fn ldr_im(&mut self){
+        fn ldr_im(&mut self, operands: Operands){
 
         }
 
-        fn add_im(&mut self){
+        fn add_im(&mut self, operands: Operands){
 
         }
 
-        fn ldr(&mut self){
+        fn ldr(&mut self, operands: Operands){
 
         }
 
-        fn or(&mut self){
+        fn or(&mut self, operands: Operands){
 
         }
 
-        fn and(&mut self){
+        fn and(&mut self, operands: Operands){
 
         }
 
-        fn xor(&mut self){
+        fn xor(&mut self, operands: Operands){
 
         }
 
-        fn add(&mut self){
+        fn add(&mut self, operands: Operands){
 
         }
 
-        fn sub(&mut self){
+        fn sub(&mut self, operands: Operands){
 
         }
 
-        fn shr(&mut self){
+        fn shr(&mut self, operands: Operands){
 
         }
 
-        fn subn(&mut self){
-
-        }
-        
-        fn shl(&mut self){
-
-        }
-
-        fn sne(&mut self){
-
-        }
-
-        fn ld_i(&mut self){
-
-        }
-
-        fn jp_reg(&mut self){
+        fn subn(&mut self, operands: Operands){
 
         }
         
-        fn rnd(&mut self){
+        fn shl(&mut self, operands: Operands){
+
+        }
+
+        fn sne(&mut self, operands: Operands){
+
+        }
+
+        fn ld_i(&mut self, operands: Operands){
+
+        }
+
+        fn jp_reg(&mut self, operands: Operands){
 
         }
         
-        fn display(&mut self){
+        fn rnd(&mut self, operands: Operands){
 
         }
         
-        fn skp(&mut self){
+        fn display(&mut self, operands: Operands){
 
         }
         
-        fn sknp(&mut self){
+        fn skp(&mut self, operands: Operands){
 
         }
         
-        fn ldr_dt(&mut self){
+        fn sknp(&mut self, operands: Operands){
 
         }
         
-        fn ldr_kp(&mut self){
+        fn ldr_dt(&mut self, operands: Operands){
 
         }
         
-        fn ld_dt(&mut self){
+        fn ldr_kp(&mut self, operands: Operands){
 
         }
         
-        fn ld_st(&mut self){
+        fn ld_dt(&mut self, operands: Operands){
 
         }
         
-        fn add_i(&mut self){
+        fn ld_st(&mut self, operands: Operands){
 
         }
         
-        fn ld_b(&mut self){
+        fn add_i(&mut self, operands: Operands){
+
+        }
+
+        fn add_sp(&mut self, operands: Operands) {
 
         }
         
-        fn ld_mul(&mut self){
+        fn ld_b(&mut self, operands: Operands){
 
         }
         
-        fn ldr_mul(&mut self){
+        fn ld_mul(&mut self, operands: Operands){
+
+        }
+        
+        fn ldr_mul(&mut self, operands: Operands){
 
         }
     }
