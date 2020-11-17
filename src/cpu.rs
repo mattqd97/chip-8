@@ -2,6 +2,7 @@ mod cpu {
     const DISPLAY_WIDTH: usize = 32;
     const DISPLAY_HEIGHT: usize = 64;
     const RAM_SIZE: usize = 4096;
+    use rand::Rng;
 
     pub struct Cpu {
         v: [u8; 16], // Creates 16 v variables with type u8.
@@ -67,27 +68,26 @@ mod cpu {
             }
         }
 
-        fn NNN(self) -> u16 {
+        fn nnn(self) -> u16 {
             self.instruction & 0x0FFF // Lowest 12 bits
         }
 
-        fn NN(self) -> u16 {
+        fn nn(self) -> u16 {
             self.instruction & 0x00FF // Lowest 8 bits
         }
 
-        fn N(self) -> u16 {
+        fn n(self) -> u16 {
             self.instruction & 0x000F // Lowest 4 bits
         }
 
-        fn X(self) -> u16 {
-            (self.instruction >> 8) & 0x000F // Lower 4 of high byte
+        fn x(self) -> usize {
+            ((self.instruction >> 8) & 0x000F).into() // Lower 4 of high byte
         }
 
-        fn Y(self) -> u16 {
-            (self.instruction >> 4) & 0x000F // Upper 4 of lowe byte
+        fn y(self) -> usize {
+            ((self.instruction >> 4) & 0x000F).into() // Upper 4 of lower byte
         }
 
-        // let kk = (instruction & 0x00FF) as u8; // lowest 8 bits
     }
 
     impl Cpu {
@@ -111,10 +111,10 @@ mod cpu {
            let instruction = self.fetch();
 
            // Decode the instruction
-           let (opcode, nnn, n, x, y, kk) = Cpu::decode(instruction);
+           let (opcode, operands) = Cpu::decode(instruction);
 
            // Execute the instruction
-           self.execute(opcode, nnn, n, x, y, kk);
+           self.execute(opcode, operands);
 
            // Update Timers
            self.update_timers();
@@ -136,7 +136,7 @@ mod cpu {
             // Get opcode
             let opcode = (instruction >> 12) as u8;
             let opcode: Opcode = match opcode {
-                0 => match operands.NN() {
+                0 => match operands.nn() {
                     0xE0 => Opcode::CLS,
                     0xEE => Opcode::RET,
                     _    => Opcode::UNKNOWN,
@@ -148,7 +148,7 @@ mod cpu {
                 5 => Opcode::SE,
                 6 => Opcode::LDR_IM,
                 7 => Opcode::ADD_IM,
-                8 => match operands.N() {
+                8 => match operands.n() {
                     0x0 => Opcode::LDR,
                     0x1 => Opcode::OR,
                     0x2 => Opcode::AND,
@@ -165,12 +165,12 @@ mod cpu {
                 0xB => Opcode::JP_REG,
                 0xC => Opcode::RND,
                 0xD => Opcode::DISPLAY,
-                0xE => match operands.NN() {
+                0xE => match operands.nn() {
                     0x9E => Opcode::SKP,
                     0xA1 => Opcode::SKNP,
                     _    => Opcode::UNKNOWN,
                 }
-                0xF => match operands.NN() {
+                0xF => match operands.nn() {
                     0x07 => Opcode::LDR_DT,
                     0x0A => Opcode::LDR_KP,
                     0x15 => Opcode::LD_DT,
@@ -185,11 +185,7 @@ mod cpu {
                 _ => Opcode::UNKNOWN,
             };
 
-
-            // Would let x = instruction & 0x000F do the same thing?
-            // 0x1234 >> 12 = 0x0001. 0x1234 & 0x000F = 0x1234
-
-            (opcode, operands) // What does this do? Returns the tuple
+            (opcode, operands)
         }
 
         fn execute(&mut self, opcode: Opcode, operands: Operands) {
@@ -242,135 +238,167 @@ mod cpu {
         }
 
         fn ret(&mut self){
-
+            // Set pc to address at top of the stack
+            self.pc -= 1;
         }
 
         fn jp(&mut self, operands: Operands){
-
+            self.pc = operands.nnn();
         }
 
         fn call(&mut self, operands: Operands){
-
+            self.sp += 1;
+            // Put pc to top of stack
+            self.pc = operands.nnn();
         }
 
         fn se_imm(&mut self, operands: Operands){
-
+            if self.v[operands.x()] == operands.nn() as u8 {
+                self.pc += 2
+            }
         }
 
         fn sne_imm(&mut self, operands: Operands){
-
+            if self.v[operands.x()] != operands.nn() as u8 {
+                self.pc += 2
+            }
         }
 
         fn se(&mut self, operands: Operands){
-
+            if self.v[operands.x()] == self.v[operands.y()] {
+                self.pc += 2
+            }
         }
 
         fn ldr_im(&mut self, operands: Operands){
-
+            self.v[operands.x()] = operands.nn() as u8;
+            self.pc += 2
         }
 
         fn add_im(&mut self, operands: Operands){
-
+            self.v[operands.x()] = self.v[operands.x()] + operands.nn() as u8;
+            self.pc += 2
         }
 
         fn ldr(&mut self, operands: Operands){
-
+            self.v[operands.x()] = self.v[operands.y()];
+            self.pc += 2
         }
 
         fn or(&mut self, operands: Operands){
-
+            self.v[operands.x()] = self.v[operands.x()] | self.v[operands.y()];
+            self.pc += 2
         }
 
         fn and(&mut self, operands: Operands){
-
+            self.v[operands.x()] = self.v[operands.x()] & self.v[operands.y()];
+            self.pc += 2
         }
 
         fn xor(&mut self, operands: Operands){
-
+            self.v[operands.x()] = self.v[operands.x()] ^ self.v[operands.y()];
+            self.pc += 2
         }
 
         fn add(&mut self, operands: Operands){
+            let x = self.v[operands.x()];
+            let y = self.v[operands.y()];
+            let result = x + y;
 
+            self.v[0x0F] = if result > 0xFF { 1 } else { 0 };
         }
 
         fn sub(&mut self, operands: Operands){
+            let x = self.v[operands.x()];
+            let y = self.v[operands.y()];
 
+            self.v[0x0F] = if x > y { 1 } else { 0 };
+            self.v[operands.x()] = self.v[operands.x()] - self.v[operands.y()]
         }
 
         fn shr(&mut self, operands: Operands){
-
+            self.v[0x0F] = if self.v[operands.x()] & 0x1 == 1 { 1 } else { 0 };
+            self.v[operands.x()] = self.v[operands.x()] / 2
         }
 
         fn subn(&mut self, operands: Operands){
-
+            self.v[0x0F] = if self.v[operands.y()] > self.v[operands.x()] { 1 } else { 0 };
+            self.v[operands.x()] = self.v[operands.y()] - self.v[operands.x()]
         }
         
         fn shl(&mut self, operands: Operands){
-
+            self.v[0x0F] = if self.v[operands.x()] >> 7 == 1 { 1 } else { 0 };
+            self.v[operands.x()] = self.v[operands.x()] * 2
         }
 
         fn sne(&mut self, operands: Operands){
-
+            if self.v[operands.x()] != self.v[operands.y()]{
+                self.pc += 2}
         }
 
         fn ld_i(&mut self, operands: Operands){
-
+            self.i = operands.nnn()
         }
 
         fn jp_reg(&mut self, operands: Operands){
-
+            self.pc = self.v[0] as u16 + operands.n();
         }
         
         fn rnd(&mut self, operands: Operands){
+            let rnd_num: u8 = rand::thread_rng().gen_range(0, 255);
+            let and = rnd_num & (operands.nn() as u8);
 
+            self.v[operands.x()] = and
         }
         
         fn display(&mut self, operands: Operands){
-
+            // display sprite
         }
         
         fn skp(&mut self, operands: Operands){
-
+            // skip if key pressed
         }
         
         fn sknp(&mut self, operands: Operands){
-
+            // skip if no key pressed
         }
         
         fn ldr_dt(&mut self, operands: Operands){
-
+            self.v[operands.x()] = self.v[operands.x()] + self.delay_timer
         }
         
         fn ldr_kp(&mut self, operands: Operands){
-
+            // Wait for keypress and load reg
         }
         
         fn ld_dt(&mut self, operands: Operands){
-
+            self.v[operands.x()] = self.delay_timer
         }
         
         fn ld_st(&mut self, operands: Operands){
-
+            self.v[operands.x()] = self.sound_timer
         }
         
         fn add_i(&mut self, operands: Operands){
-
+            self.i = self.i + self.v[operands.x()] as u16
         }
 
         fn add_sp(&mut self, operands: Operands) {
-
+            // add sprite
         }
         
         fn ld_b(&mut self, operands: Operands){
+            self.ram[self.i]  
+            self.ram[self.i + 1] 
+            self.ram[self.i + 2] 
 
+            // need to look into bcd 
         }
         
         fn ld_mul(&mut self, operands: Operands){
-
         }
         
         fn ldr_mul(&mut self, operands: Operands){
-
         }
     }
 }
