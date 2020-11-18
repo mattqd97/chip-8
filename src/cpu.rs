@@ -6,10 +6,10 @@ mod cpu {
 
     pub struct Cpu {
         v: [u8; 16], // Creates 16 v variables with type u8.
-        i: u16, // 16 bit index register.
+        i: usize, // 16 bit index register.
         stack: [u16; 16], // 16, 16 bit values.
         pc: u16, // 16 bit Program counter.
-        sp: u8, // 8 bit Stack pointer.
+        sp: usize,
         delay_timer: u8, // 8 Bit delay timer.
         sound_timer: u8, // 8 Bit sound timer.
         ram: [u8; RAM_SIZE], // 4096 8 bit values to total 4k RAM?
@@ -238,8 +238,8 @@ mod cpu {
         }
 
         fn ret(&mut self){
-            // Set pc to address at top of the stack
-            self.pc -= 1;
+            self.pc = self.stack[self.sp];
+            self.sp -= 1;
         }
 
         fn jp(&mut self, operands: Operands){
@@ -248,7 +248,7 @@ mod cpu {
 
         fn call(&mut self, operands: Operands){
             self.sp += 1;
-            // Put pc to top of stack
+            self.pc = self.stack[self.sp];
             self.pc = operands.nnn();
         }
 
@@ -337,7 +337,7 @@ mod cpu {
         }
 
         fn ld_i(&mut self, operands: Operands){
-            self.i = operands.nnn()
+            self.i = operands.nnn() as usize
         }
 
         fn jp_reg(&mut self, operands: Operands){
@@ -380,7 +380,7 @@ mod cpu {
         }
         
         fn add_i(&mut self, operands: Operands){
-            self.i = self.i + self.v[operands.x()] as u16
+            self.i = self.i + self.v[operands.x()] as usize
         }
 
         fn add_sp(&mut self, operands: Operands) {
@@ -388,17 +388,25 @@ mod cpu {
         }
         
         fn ld_b(&mut self, operands: Operands){
-            self.ram[self.i]  
-            self.ram[self.i + 1] 
-            self.ram[self.i + 2] 
-
-            // need to look into bcd 
+            self.ram[self.i] = self.v[operands.x()] / 100;
+            self.ram[self.i + 1] = self.v[operands.x()] % 100 / 10;
+            self.ram[self.i + 2] = self.v[operands.x()] % 10; 
         }
         
         fn ld_mul(&mut self, operands: Operands){
+            let x = operands.x();
+
+            for i in 0..x + 1{
+                self.ram[self.i + 1]= self.v[operands.x()]
+            }
         }
         
         fn ldr_mul(&mut self, operands: Operands){
+            let x = operands.x();
+
+            for i in 0..x + 1 {
+                self.v[i] = self.ram[self.i + i];
+            }
         }
     }
 }
