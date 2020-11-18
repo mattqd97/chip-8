@@ -110,6 +110,9 @@ mod cpu {
            // Fetch the next instruction
            let instruction = self.fetch();
 
+           // Update PC
+           self.pc += 2;
+
            // Decode the instruction
            let (opcode, operands) = Cpu::decode(instruction);
 
@@ -118,9 +121,6 @@ mod cpu {
 
            // Update Timers
            self.update_timers();
-
-           // Update PC
-           self.pc += 2;
         }
 
         fn fetch(&self) -> u16 {
